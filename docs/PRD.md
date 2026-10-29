@@ -45,11 +45,11 @@ An autonomous system that takes raw I/Q samples from a radio receiver and identi
 | Phase | Deliverable | Status |
 |---|---|---|
 | 0 | Input validation, error model, auth, rate limiting, secure model loading, open-set scoring, API, full test and release-gate suite | **Built** |
-| 1 | Training pipeline, CNN baseline on RadioML, accuracy-vs-SNR report | Planned |
-| 2 | Low-SNR improvements (CLDNN/Transformer, SNR-weighted training, augmentation) | Planned |
-| 3 | Open-set training/calibration on held-out classes, AUROC report | Planned |
-| 4 | Simulator-based robustness (fading, carrier offset, multipath) | Planned |
-| 5 | SDR capture, wideband scanner, occupancy dashboard | Planned |
+| 1 | Training pipeline, CNN/CLDNN baseline on RadioML 2016, accuracy-vs-SNR report, Colab GPU notebook | **Built** |
+| 2 | Low-SNR improvements (CLDNN/Transformer, SNR-weighted training, augmentation) | **Built** |
+| 3 | Open-set training/calibration on held-out classes, AUROC report | **Built** |
+| 4 | Simulator-based robustness (fading, carrier offset, multipath) | **Built** |
+| 5 | Wideband scanner & cognitive radio channeliser; live SDR hardware driver & interactive UI dashboard | **Built** (scanner/DDC/API); live SDR hardware driver & web dashboard planned |
 
 ## 5. Functional requirements
 

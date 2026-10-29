@@ -38,7 +38,7 @@ The remaining scope consists of physical hardware integration and long-running p
 
 | # | Item | PRD Phase | Severity | Detail & Next Steps |
 |---|---|---|---|---|
-| **R1** | **RadioML Full Training Run on GPU** | Phase 1 | 🟡 Medium | Run `python scripts/train.py --data data/rml2016.npz --epochs 60` on GPU to generate benchmark weights for papers or final production deployment. |
+| **R1** | **RadioML Extended Multi-Epoch Run** | Phase 1 | 🟡 Medium | Run multi-epoch benchmark training (locally on RTX 3050 GPU or via `notebooks/train_rml2016_colab.ipynb` in Google Colab) to produce finalized release weights. |
 | **R2** | **Hardware SDR Driver** | Phase 5 | 🟢 Low | Optional USB driver script (`scripts/capture_sdr.py`) reading live I/Q from RTL-SDR, HackRF, or ADALM-Pluto to stream directly into `POST /v1/scan`. |
 | **R3** | **Interactive Occupancy Dashboard** | Phase 5 | 🟢 Low | Visual UI / web waterfall displaying active channels, classified modulations, and free-band recommendations in real time. |
 | **R4** | **Deployment Packaging (Dockerfile / CI)** | Hardening | 🟡 Medium | Add `Dockerfile`, `.dockerignore`, and `.github/workflows/ci.yml` for automated multi-platform builds. |
@@ -99,8 +99,11 @@ The remaining scope consists of physical hardware integration and long-running p
 # Using simulator (instant iteration, no download needed):
 python scripts/train.py --simulate --arch rfnet --epochs 40 --out models/
 
-# Using converted RadioML dataset with CLDNN backbone and SNR-weighting:
-python scripts/train.py --data data/rml2016.npz --arch cldnn --snr-weighted --epochs 60 --out models/
+# Using converted RadioML dataset locally on GPU (RTX 3050):
+python scripts/train.py --data data/rml2016.npz --arch cldnn --snr-weighted --epochs 50 --batch-size 256 --input-length 128 --device cuda --out models/
+
+# Using Google Colab (VS Code Colab extension or web):
+# Open notebooks/train_rml2016_colab.ipynb -> Select Kernel -> Colab -> Run All
 ```
 
 ### Calibrating Open-Set Recognition

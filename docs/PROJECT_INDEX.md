@@ -39,6 +39,8 @@ rf-mod-classifier/
 │   ├── simulator.py                     # Advanced RF simulator: RRC pulse shaping, offsets, Rayleigh/Rician fading
 │   ├── synth.py                         # Deterministic baseband test signal generator (BPSK/QPSK/8PSK/QAM16)
 │   └── validation.py                    # Strict I/Q validation (2 x N), length bounds, power normalisation
+├── notebooks/                           # Interactive Jupyter notebooks for cloud/GPU training
+│   └── train_rml2016_colab.ipynb        # RadioML 2016.10A end-to-end training notebook (Google Colab / VS Code)
 ├── scripts/                             # ML pipeline & dataset utilities (isolated from serving)
 │   ├── calibrate_openset.py             # Phase 3 open-set calibration on held-out unknown waveforms
 │   ├── convert_radioml.py               # Converter for RadioML 2016 (.pkl) and 2018 (.hdf5) to safe .npz
@@ -222,6 +224,9 @@ graph TD
 | [**`scripts/evaluate.py`**](file:///c:/Users/maury/Documents/Machine%20Learning/rf-mod-classifier/scripts/evaluate.py) | Standalone evaluation & gate export | `--model`, `--model-card`, `--data`, `--simulate`, `--acceptance`, `--out` |
 | [**`scripts/calibrate_openset.py`**](file:///c:/Users/maury/Documents/Machine%20Learning/rf-mod-classifier/scripts/calibrate_openset.py) | Open-set calibration on held-out waveforms | `--model`, `--model-card`, `--simulate`, `--known`, `--unknown`, `--tpr`, `--out` |
 | [**`scripts/convert_radioml.py`**](file:///c:/Users/maury/Documents/Machine%20Learning/rf-mod-classifier/scripts/convert_radioml.py) | RadioML `.pkl` / `.hdf5` conversion | `rml2016` / `rml2018`, input path, `-o/--output` |
+
+### 5.1 Interactive Notebooks
+- [**`notebooks/train_rml2016_colab.ipynb`**](file:///c:/Users/maury/Documents/Machine%20Learning/rf-mod-classifier/notebooks/train_rml2016_colab.ipynb): End-to-end interactive notebook configured for Google Colab and the VS Code Colab extension. Supports GPU-accelerated training (`cldnn`, `rfnet`, `transformer`), test-set evaluation, open-set calibration, inline plotting, and one-click artifact download.
 
 ---
 
