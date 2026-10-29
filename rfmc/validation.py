@@ -16,6 +16,7 @@ MAX_LEN = 4096
 MAX_ABS = 1e6
 MAX_SAMPLE_RATE_HZ = 1e11
 ALLOWED_FIELDS = frozenset({"iq", "sample_rate_hz"})
+ALLOWED_SCAN_FIELDS = frozenset({"iq", "sample_rate_hz", "threshold_db", "min_free_bandwidth_hz"})
 
 _CTRL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 
@@ -101,3 +102,60 @@ def validate_classify_payload(
         raise ValidationError("Missing required field 'iq'.")
     iq = validate_iq_array(payload["iq"], min_len=min_len, max_len=max_len)
     return ClassifyRequest(iq=iq, sample_rate_hz=validate_sample_rate(payload.get("sample_rate_hz")))
+
+
+@dataclass(frozen=True)
+class ScanRequest:
+    iq: np.ndarray
+    sample_rate_hz: float
+    threshold_db: float
+    min_free_bandwidth_hz: float
+
+
+def validate_scan_payload(
+    payload: Any,
+    *,
+    min_len: int = 512,
+    max_len: int = 131072,
+) -> ScanRequest:
+    if not isinstance(payload, dict):
+        raise ValidationError("Request body must be a JSON object.")
+    unknown = [k for k in payload if k not in ALLOWED_SCAN_FIELDS]
+    if unknown:
+        shown = ", ".join(_clip(k) for k in unknown[:5])
+        raise ValidationError(f"Unknown field(s): {shown}")
+    if "iq" not in payload:
+        raise ValidationError("Missing required field 'iq'.")
+    iq = validate_iq_array(payload["iq"], min_len=min_len, max_len=max_len)
+
+    sr_val = payload.get("sample_rate_hz")
+    sample_rate_hz = 20_000_000.0 if sr_val is None else validate_sample_rate(sr_val)
+    if sample_rate_hz is None:
+        sample_rate_hz = 20_000_000.0
+
+    thresh_val = payload.get("threshold_db")
+    if thresh_val is not None:
+        if isinstance(thresh_val, bool) or not isinstance(thresh_val, (int, float)):
+            raise ValidationError("'threshold_db' must be a number.")
+        threshold_db = float(thresh_val)
+        if not math.isfinite(threshold_db) or threshold_db <= 0.0 or threshold_db > 100.0:
+            raise ValidationError("'threshold_db' must be a positive number <= 100.")
+    else:
+        threshold_db = 6.0
+
+    bw_val = payload.get("min_free_bandwidth_hz")
+    if bw_val is not None:
+        if isinstance(bw_val, bool) or not isinstance(bw_val, (int, float)):
+            raise ValidationError("'min_free_bandwidth_hz' must be a number.")
+        min_free_bw = float(bw_val)
+        if not math.isfinite(min_free_bw) or min_free_bw <= 0.0 or min_free_bw > sample_rate_hz:
+            raise ValidationError("'min_free_bandwidth_hz' must be positive and <= sample_rate_hz.")
+    else:
+        min_free_bw = 1_000_000.0
+
+    return ScanRequest(
+        iq=iq,
+        sample_rate_hz=sample_rate_hz,
+        threshold_db=threshold_db,
+        min_free_bandwidth_hz=min_free_bw,
+    )

@@ -27,6 +27,7 @@ from .errors import (
     error_body,
     error_body_for,
 )
+from .scanner import WidebandScanner
 from .security import (
     HSTS,
     SECURITY_HEADERS,
@@ -36,7 +37,7 @@ from .security import (
     sanitize_for_log,
     verify_api_key,
 )
-from .validation import validate_classify_payload
+from .validation import validate_classify_payload, validate_scan_payload
 
 log = logging.getLogger("rfmc.api")
 
@@ -169,6 +170,107 @@ def create_app(service, settings: Settings) -> FastAPI:
             "openset_score": pred.openset_score,
             "top_k": [{"label": l, "probability": p} for l, p in pred.top_k],
             "num_samples": int(req.iq.shape[1]),
+            "model_version": service.model_version,
+        }
+
+    scanner = WidebandScanner(classifier=service)
+
+    @app.post("/v1/scan")
+    async def scan(request: Request):
+        rid = request.state.request_id
+        ip = request.client.host if request.client else "unknown"
+        ip_limiter.check(ip)
+
+        api_key = request.headers.get("x-api-key")
+        if not verify_api_key(api_key, settings.api_keys):
+            log.warning("auth failed rid=%s ip=%s", rid, sanitize_for_log(ip))
+            raise UnauthorizedError()
+        fingerprint = key_fingerprint(api_key)
+        key_limiter.check(fingerprint)
+
+        ctype = request.headers.get("content-type", "").split(";")[0].strip().lower()
+        if ctype != "application/json":
+            raise UnsupportedMediaTypeError()
+        body = await _read_body(request, settings.max_body_bytes)
+        try:
+            payload = json.loads(body)
+        except (ValueError, UnicodeDecodeError, RecursionError):
+            raise BadRequestError("Body is not valid JSON.") from None
+
+        req = validate_scan_payload(payload)
+
+        started = time.perf_counter()
+        try:
+            result = await asyncio.wait_for(
+                run_in_threadpool(
+                    scanner.scan,
+                    req.iq,
+                    sample_rate_hz=req.sample_rate_hz,
+                    threshold_db=req.threshold_db,
+                    min_free_bandwidth_hz=req.min_free_bandwidth_hz,
+                ),
+                timeout=settings.inference_timeout_s * 2,
+            )
+        except asyncio.TimeoutError:
+            raise InferenceTimeoutError() from None
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+        log.info(
+            "scan ok rid=%s key=%s n=%d channels=%d free=%d ms=%.1f",
+            rid, fingerprint, req.iq.shape[1], len(result.channels), len(result.free_bands), elapsed_ms,
+        )
+
+        channels_out = []
+        for ch in result.channels:
+            item = {
+                "channel_id": ch.channel_id,
+                "center_freq_hz": ch.center_freq_hz,
+                "bandwidth_hz": ch.bandwidth_hz,
+                "power_db": ch.power_db,
+                "snr_db": ch.snr_db,
+                "occupied": ch.occupied,
+            }
+            if ch.prediction:
+                item["classification"] = {
+                    "modulation": ch.prediction.label,
+                    "unknown": ch.prediction.unknown,
+                    "closest_known": ch.prediction.closest_known,
+                    "confidence": ch.prediction.confidence,
+                    "openset_score": ch.prediction.openset_score,
+                }
+            channels_out.append(item)
+
+        free_out = [
+            {
+                "start_freq_hz": fb.start_freq_hz,
+                "stop_freq_hz": fb.stop_freq_hz,
+                "center_freq_hz": fb.center_freq_hz,
+                "bandwidth_hz": fb.bandwidth_hz,
+                "noise_power_db": fb.noise_power_db,
+            }
+            for fb in result.free_bands
+        ]
+
+        rec_out = None
+        if result.recommended_free_band:
+            rec_out = {
+                "start_freq_hz": result.recommended_free_band.start_freq_hz,
+                "stop_freq_hz": result.recommended_free_band.stop_freq_hz,
+                "center_freq_hz": result.recommended_free_band.center_freq_hz,
+                "bandwidth_hz": result.recommended_free_band.bandwidth_hz,
+                "noise_power_db": result.recommended_free_band.noise_power_db,
+            }
+
+        return {
+            "request_id": rid,
+            "sample_rate_hz": result.sample_rate_hz,
+            "noise_floor_db": result.noise_floor_db,
+            "total_bandwidth_hz": result.total_bandwidth_hz,
+            "occupied_bandwidth_hz": result.occupied_bandwidth_hz,
+            "spectral_occupancy_ratio": result.spectral_occupancy_ratio,
+            "num_channels_detected": len(channels_out),
+            "channels": channels_out,
+            "free_bands": free_out,
+            "recommended_free_band": rec_out,
             "model_version": service.model_version,
         }
 

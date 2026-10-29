@@ -35,7 +35,7 @@ DOCS = ROOT / "docs"
 
 def test_all_dependencies_are_pinned():
     for req in ROOT.glob("requirements*.txt"):
-        for line in req.read_text().splitlines():
+        for line in req.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line or line.startswith(("#", "-r")):
                 continue
@@ -50,7 +50,7 @@ def test_no_secrets_committed():
     ]
     assert not list(ROOT.rglob(".env*")), "env files must not be committed"
     for path in list(PKG.rglob("*.py")) + list(DOCS.rglob("*.md")) + list(ROOT.glob("*.md")) + list(ROOT.glob("*.toml")):
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
         for pat in patterns:
             assert not pat.search(text), f"possible secret in {path.relative_to(ROOT)}"
 
@@ -97,7 +97,7 @@ def test_scanner_actually_detects_violations():  # guards against a vacuous gate
 
 @pytest.mark.parametrize("path", sorted(PKG.glob("*.py")), ids=lambda p: p.name)
 def test_package_has_no_dangerous_constructs(path):
-    assert find_violations(path.read_text()) == []
+    assert find_violations(path.read_text(encoding="utf-8")) == []
 
 
 # ---------------------------------------------------------------- hostile-input gate

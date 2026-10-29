@@ -141,7 +141,7 @@ def test_prediction_is_deterministic():
 def test_torch_model_roundtrip(tmp_path):
     torch = pytest.importorskip("torch")
     from rfmc.errors import SecurityError
-    from rfmc.model_torch import RFNet, load_torch_backbone
+    from rfmc.model_torch import RFNet, build_model, load_torch_backbone
     import hashlib
 
     net = RFNet(4)
@@ -153,3 +153,27 @@ def test_torch_model_roundtrip(tmp_path):
     assert logits.shape == (1, 4) and emb.shape == (1, 256)
     with pytest.raises(SecurityError):
         load_torch_backbone(path, allowed_dir=tmp_path, expected_sha256="0" * 64, n_classes=4)
+
+
+@pytest.mark.parametrize("arch", ["rfnet", "cldnn", "transformer"])
+def test_all_architectures_produce_valid_shapes(arch, tmp_path):
+    torch = pytest.importorskip("torch")
+    from rfmc.model_torch import build_model, load_torch_backbone
+    import hashlib
+
+    net = build_model(arch, n_classes=6)
+    x = torch.randn(2, 2, 256)
+    logits, emb = net(x)
+    assert logits.shape == (2, 6)
+    assert emb.shape == (2, 256)
+    assert torch.isfinite(logits).all()
+    assert torch.isfinite(emb).all()
+
+    # Test safe loader roundtrip
+    path = tmp_path / f"{arch}.pt"
+    torch.save(net.state_dict(), path)
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    bb = load_torch_backbone(path, allowed_dir=tmp_path, expected_sha256=digest, n_classes=6, arch=arch)
+    np_logits, np_emb = bb(np.zeros((1, 2, 256), dtype=np.float32))
+    assert np_logits.shape == (1, 6)
+    assert np_emb.shape == (1, 256)

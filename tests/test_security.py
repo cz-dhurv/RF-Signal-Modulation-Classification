@@ -132,7 +132,10 @@ def test_model_path_confinement(tmp_path):
         ensure_safe_model_path(tmp_path / ".." / "outside.pt", tmp_path)
 
     link = tmp_path / "link.pt"
-    os.symlink(outside, link)
+    try:
+        os.symlink(outside, link)
+    except OSError:
+        pytest.skip("symlinks not supported or permitted on this platform")
     with pytest.raises(SecurityError):  # symlink escape
         ensure_safe_model_path(link, tmp_path)
 
